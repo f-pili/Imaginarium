@@ -1,16 +1,13 @@
 package it.fpili.imaginarium.cli;
 
 import it.fpili.imaginarium.Main;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class CliIntegrationTest {
     private InputStream sysInBackup;
@@ -19,11 +16,10 @@ class CliIntegrationTest {
 
     @BeforeEach
     void setup() throws Exception {
-        // Ensure clean data folder for the CLI (relative path used by Main).
         Path dataDir = Path.of("data");
         Files.createDirectories(dataDir);
         Files.deleteIfExists(dataDir.resolve("items.csv"));
-
+        Files.deleteIfExists(dataDir.resolve("items.json"));
         sysInBackup = System.in;
         sysOutBackup = System.out;
         out = new ByteArrayOutputStream();
@@ -37,28 +33,36 @@ class CliIntegrationTest {
     }
 
     @Test
-    void fullCliFlow_add_list_search_then_exit() throws Exception {
+    void fullCliFlow_add_list_search_then_exit() {
         String userInput = String.join("\n",
-                "1",                 // Add/Update
-                "id-100",
-                "Sky Spoon",
-                "Tools",
-                "Scoops clouds",
-                "2",                 // List
-                "3",                 // Search
-                "Spoon",
-                "0"                  // Exit
-        ) + "\n";
-
+                "1","id-100","Sky Spoon","Tools","Scoops clouds",
+                "2","3","Spoon","0") + "\n";
         System.setIn(new ByteArrayInputStream(userInput.getBytes(StandardCharsets.UTF_8)));
+        Main.main(new String[0]);
+        String output = out.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("Saved."));
+        assertTrue(output.contains("Sky Spoon"));
+        assertTrue(output.contains("Matches:"));
+    }
 
-        // Run the CLI; it will read from the provided System.in and write to captured System.out.
+    @Test
+    void exportJsonEndToEnd_createsItemsJson() throws Exception {
+        String userInput = String.join("\n",
+                "1","id-200","Echo Jar","Containers","Stores echoes",
+                "6", // Export catalog to JSON
+                "0") + "\n";
+        System.setIn(new ByteArrayInputStream(userInput.getBytes(StandardCharsets.UTF_8)));
         Main.main(new String[0]);
 
+        Path jsonPath = Path.of("data","items.json");
+        assertTrue(Files.exists(jsonPath), "items.json should be created");
+        String json = Files.readString(jsonPath, StandardCharsets.UTF_8);
+        assertTrue(json.startsWith("{\"data\":["));
+        assertTrue(json.contains("\"id\":\"id-200\""));
+        assertTrue(json.endsWith("]}"));
+
         String output = out.toString(StandardCharsets.UTF_8);
-        assertTrue(output.contains("Saved."), "Item should be saved");
-        assertTrue(output.contains("Sky Spoon"), "Listing should show the item");
-        assertTrue(output.contains("Matches:"), "Search should print matches header");
-        assertTrue(output.contains("Spoon"), "Search results should contain the item");
+        assertTrue(output.contains("Exported to data/items.json"));
     }
 }
+

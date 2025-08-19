@@ -56,6 +56,7 @@ public final class Main {
                     case "3" -> searchFlow(sc, service, shield);
                     case "4" -> printCategoryTreeFlow(service, shield);
                     case "5" -> iterateItemsFlow(service, shield);
+                    case "6" -> exportJsonFlow(service, shield);
                     case "0" -> {
                         running = false;
                         System.out.println("Bye!");
@@ -83,7 +84,8 @@ public final class Main {
         System.out.println("2) List items");
         System.out.println("3) Search items");
         System.out.println("4) Show categories tree");
-        System.out.println("5) Iterate items (custom iterator)");
+        System.out.println("5) Iterate items");
+        System.out.println("6) Export catalog to JSON");
         System.out.println("0) Exit");
     }
 
@@ -216,6 +218,22 @@ public final class Main {
         } catch (ApplicationException ae) {
             System.err.println(ae.getMessage());
             log.log(Level.WARNING, "Iterator flow error", ae);
+        }
+    }
+
+    private static void exportJsonFlow(CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            String json = shield.guard(() -> {
+                var adapter = new it.fpili.imaginarium.adapter.CsvRepositoryToJsonAdapter(
+                        new it.fpili.imaginarium.persistence.CsvItemRepository(java.nio.file.Path.of("data","items.csv"))
+                );
+                return adapter.toJson();
+            }, "Could not export JSON.");
+
+            it.fpili.imaginarium.util.SafeIO.writeUtf8(java.nio.file.Path.of("data","items.json"), json);
+            System.out.println("Exported to data/items.json");
+        } catch (it.fpili.imaginarium.exception.ApplicationException ae) {
+            System.err.println(ae.getMessage());
         }
     }
 }
