@@ -63,7 +63,7 @@ public final class Main {
                     case "4" -> searchFlow(sc, service, shield);
                     case "5" -> printCategoryTreeFlow(service, shield);
                     case "6" -> iterateItemsFlow(service, shield);
-                    case "7" -> exportJsonFlow(service, shield);
+                    case "7" -> exportJsonFlow(shield);
                     case "0" -> {
                         running = false;
                         System.out.println("Bye!");
@@ -268,13 +268,14 @@ public final class Main {
     /**
      * Exports the catalog to JSON through the Adapter and writes it to {@code data/items.json}.
      *
-     * @param service catalog service (unused here but kept for symmetry/future needs)
-     * @param shield  shielding handler
+     * @param shield shielding handler
      */
-    private static void exportJsonFlow(CatalogService service, ExceptionShieldingHandler shield) {
+    private static void exportJsonFlow(ExceptionShieldingHandler shield) {
         try {
             String json = shield.guard(() -> {
-                var adapter = new CsvRepositoryToJsonAdapter(new CsvItemRepository(Path.of("data", "items.csv")));
+                var adapter = new CsvRepositoryToJsonAdapter(
+                        new CsvItemRepository(Path.of("data", "items.csv"))
+                );
                 return adapter.toJson();
             }, "Could not export JSON.");
 
