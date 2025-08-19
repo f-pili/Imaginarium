@@ -11,8 +11,12 @@ import java.util.*;
 import java.util.logging.Logger;
 
 /**
- * CSV-backed repository for Item. File format: id,name,category,description
- * In-memory index maintained on load/save for O(1) lookups.
+ * Repository backed by a CSV file for storing {@link Item} entities.
+ * <p>
+ * File format: {@code ID,Name,Category,Description}
+ * The first line is always a header, automatically written on persist.
+ * Data is cached in an in-memory map for efficient lookups.
+ * </p>
  */
 public final class CsvItemRepository implements Repository<Item, String> {
     private static final Logger log = LoggerConfig.getLogger(CsvItemRepository.class);
@@ -20,36 +24,66 @@ public final class CsvItemRepository implements Repository<Item, String> {
     private final Map<String, Item> index = new LinkedHashMap<>();
 
     /**
-     * Creates a repository bound to a CSV file path.
-     * @param csvPath path to CSV file (will be created on first save)
+     * Creates a repository bound to a specific CSV file path.
+     * The file is loaded immediately if it exists.
+     *
+     * @param csvPath path to the CSV file (created automatically on first save if missing)
      */
     public CsvItemRepository(Path csvPath) {
         this.file = Objects.requireNonNull(csvPath, "csvPath");
         loadQuietly();
     }
 
+    /**
+     * Saves or updates an item in the repository and persists changes to disk.
+     *
+     * @param entity the item to save
+     * @throws IoOperationException if the write operation fails
+     */
     @Override
     public synchronized void save(Item entity) throws IoOperationException {
         index.put(entity.id(), entity);
         persist();
     }
 
+    /**
+     * Finds an item by its unique ID.
+     *
+     * @param id the item identifier
+     * @return an {@link Optional} containing the item if present, otherwise empty
+     */
     @Override
     public synchronized Optional<Item> findById(String id) {
         return Optional.ofNullable(index.get(id));
     }
 
+    /**
+     * Retrieves all items currently stored in the repository.
+     *
+     * @return immutable list of items (never null)
+     */
     @Override
     public synchronized List<Item> findAll() {
         return List.copyOf(index.values());
     }
 
+    /**
+     * Deletes an item by its ID and persists changes to disk.
+     *
+     * @param id the item identifier
+     * @throws IoOperationException if the write operation fails
+     */
     @Override
     public synchronized void deleteById(String id) throws IoOperationException {
         index.remove(id);
         persist();
     }
 
+    /**
+     * Loads items from the CSV file into memory.
+     * Skips header and malformed lines.
+     * Logs warnings on load failure instead of throwing.
+     */
     private void loadQuietly() {
         try {
             if (!java.nio.file.Files.exists(file)) return;
@@ -59,7 +93,10 @@ public final class CsvItemRepository implements Repository<Item, String> {
                 if (line.isBlank()) continue;
                 if (line.regionMatches(true, 0, "ID,Name,Category,Description", 0, 28)) continue; // skip header
                 String[] cols = CsvUtil.parseLine(line);
-                if (cols.length < 4) { log.warning("Skipping malformed line: " + line); continue; }
+                if (cols.length < 4) {
+                    log.warning("Skipping malformed line: " + line);
+                    continue;
+                }
                 Item it = new CsvItemCreator(cols).build();
                 index.put(it.id(), it);
             }
@@ -69,6 +106,12 @@ public final class CsvItemRepository implements Repository<Item, String> {
         }
     }
 
+    /**
+     * Persists the in-memory index to the CSV file,
+     * always writing a header line first.
+     *
+     * @throws IoOperationException if the write operation fails
+     */
     private void persist() throws IoOperationException {
         StringBuilder sb = new StringBuilder();
 
@@ -85,3 +128,4 @@ public final class CsvItemRepository implements Repository<Item, String> {
         log.fine("CSV persisted: " + index.size() + " items (with header)");
     }
 }
+

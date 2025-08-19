@@ -1,16 +1,20 @@
 package it.fpili.imaginarium;
 
+import it.fpili.imaginarium.adapter.CsvRepositoryToJsonAdapter;
 import it.fpili.imaginarium.composite.CatalogCategory;
 import it.fpili.imaginarium.composite.CatalogComponent;
 import it.fpili.imaginarium.composite.CatalogItem;
 import it.fpili.imaginarium.exception.ApplicationException;
 import it.fpili.imaginarium.exception.InputValidationException;
+import it.fpili.imaginarium.iterator.CatalogItemCollection;
+import it.fpili.imaginarium.iterator.ItemIterator;
 import it.fpili.imaginarium.model.Item;
 import it.fpili.imaginarium.persistence.CsvItemRepository;
 import it.fpili.imaginarium.service.CatalogService;
 import it.fpili.imaginarium.shielding.ExceptionShieldingHandler;
 import it.fpili.imaginarium.util.InputSanitizer;
 import it.fpili.imaginarium.util.LoggerConfig;
+import it.fpili.imaginarium.util.SafeIO;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -21,25 +25,27 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Command-line interface for the Imaginarium catalog.
- * Features: add, list, search, category tree (Composite), custom iteration (Iterator),
- * logging, input sanitization and exception shielding.
+ * Command-line entry point for the Imaginarium application.
+ *
+ * <p>Responsibilities:
+ * present a text menu, sanitize user input, delegate to services,
+ * and shield user-facing errors via {@link ExceptionShieldingHandler}.</p>
+ *
+ * <p>This class is console-oriented and prints user-facing messages.</p>
  */
 public final class Main {
     private static final Logger log = LoggerConfig.getLogger(Main.class);
 
     /**
-     * Application entry point. Presents a looped menu and delegates to flows.
+     * Application entry point. Shows a looped menu and delegates to flows.
      *
      * @param args command-line arguments (unused)
      */
     public static void main(String[] args) {
         log.info("Imaginarium CLI started");
 
-        // Repository + Service wiring (no hardcoded secrets/paths beyond relative demo data path).
-        CatalogService service = new CatalogService(
-                new CsvItemRepository(Path.of("data", "items.csv"))
-        );
+        // Repository + Service wiring (relative data path; no hardcoded secrets).
+        CatalogService service = new CatalogService(new CsvItemRepository(Path.of("data", "items.csv")));
 
         // Centralized Exception Shielding handler.
         ExceptionShieldingHandler shield = new ExceptionShieldingHandler(log);
@@ -52,11 +58,12 @@ public final class Main {
                 String choice = sc.nextLine().trim();
                 switch (choice) {
                     case "1" -> addItemFlow(sc, service, shield);
-                    case "2" -> listItemsFlow(service, shield);
-                    case "3" -> searchFlow(sc, service, shield);
-                    case "4" -> printCategoryTreeFlow(service, shield);
-                    case "5" -> iterateItemsFlow(service, shield);
-                    case "6" -> exportJsonFlow(service, shield);
+                    case "2" -> deleteItemFlow(sc, service, shield);
+                    case "3" -> listItemsFlow(service, shield);
+                    case "4" -> searchFlow(sc, service, shield);
+                    case "5" -> printCategoryTreeFlow(service, shield);
+                    case "6" -> iterateItemsFlow(service, shield);
+                    case "7" -> exportJsonFlow(service, shield);
                     case "0" -> {
                         running = false;
                         System.out.println("Bye!");
@@ -65,7 +72,7 @@ public final class Main {
                 }
             }
         } catch (Exception ex) {
-            // Last-resort guard for the CLI loop
+            // Last-resort guard for the CLI loop.
             log.log(Level.SEVERE, "Fatal error in CLI loop", ex);
             System.err.println("Unexpected error. Please check logs.");
             System.exit(2);
@@ -74,23 +81,26 @@ public final class Main {
         log.info("Imaginarium CLI stopped");
     }
 
-    /**
-     * Prints the main menu.
-     */
+    /** Prints the main menu. */
     private static void printMenu() {
         System.out.println();
         System.out.println("=== Imaginarium Catalog ===");
         System.out.println("1) Add/Update item");
-        System.out.println("2) List items");
-        System.out.println("3) Search items");
-        System.out.println("4) Show categories tree");
-        System.out.println("5) Iterate items");
-        System.out.println("6) Export catalog to JSON");
+        System.out.println("2) Delete item");
+        System.out.println("3) List items");
+        System.out.println("4) Search items");
+        System.out.println("5) Show categories tree");
+        System.out.println("6) Iterate items");
+        System.out.println("7) Export catalog to JSON");
         System.out.println("0) Exit");
     }
 
     /**
-     * Handles the "add/update item" flow: reads sanitized input and calls the service through shielding.
+     * Reads sanitized fields and upserts an item through the service under exception shielding.
+     *
+     * @param sc      console scanner
+     * @param service catalog service
+     * @param shield  shielding handler
      */
     private static void addItemFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
         try {
@@ -114,14 +124,40 @@ public final class Main {
             System.err.println("Validation error: " + ive.getMessage());
             log.log(Level.WARNING, "Validation failed during addItem", ive);
         } catch (ApplicationException ae) {
-            // Shielded message already safe for the user
             System.err.println(ae.getMessage());
             log.log(Level.WARNING, "Application error during save", ae);
         }
     }
 
     /**
+     * Handles the "delete item" flow: asks for an ID and deletes it.
+     */
+    private static void deleteItemFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            System.out.print("Enter ID to delete (max 40): ");
+            String id = InputSanitizer.sanitizeLine(sc.nextLine(), 40);
+
+            shield.guard(() -> {
+                service.deleteItem(id);
+                return null;
+            }, "Could not delete item. Please try again.");
+
+            System.out.println("Deleted item with id=" + id);
+            log.info("Deleted item id=" + id);
+        } catch (InputValidationException ive) {
+            System.err.println("Validation error: " + ive.getMessage());
+            log.log(Level.WARNING, "Validation failed during deleteItem", ive);
+        } catch (ApplicationException ae) {
+            System.err.println(ae.getMessage());
+            log.log(Level.WARNING, "Application error during delete", ae);
+        }
+    }
+
+    /**
      * Lists all items using the service guarded by Exception Shielding.
+     *
+     * @param service catalog service
+     * @param shield  shielding handler
      */
     private static void listItemsFlow(CatalogService service, ExceptionShieldingHandler shield) {
         try {
@@ -140,7 +176,11 @@ public final class Main {
     }
 
     /**
-     * Searches items by a token with input sanitization and shielding.
+     * Searches items by token with sanitization and shielding.
+     *
+     * @param sc      console scanner
+     * @param service catalog service
+     * @param shield  shielding handler
      */
     private static void searchFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
         try {
@@ -167,7 +207,10 @@ public final class Main {
     }
 
     /**
-     * Builds a Composite tree grouping items by their category and prints it.
+     * Builds a Composite tree grouping items by category and prints it.
+     *
+     * @param service catalog service
+     * @param shield  shielding handler
      */
     private static void printCategoryTreeFlow(CatalogService service, ExceptionShieldingHandler shield) {
         try {
@@ -195,7 +238,10 @@ public final class Main {
     }
 
     /**
-     * Demonstrates custom iteration over items using our Iterator pattern implementation.
+     * Demonstrates custom iteration over items using our Iterator implementation.
+     *
+     * @param service catalog service
+     * @param shield  shielding handler
      */
     private static void iterateItemsFlow(CatalogService service, ExceptionShieldingHandler shield) {
         try {
@@ -204,12 +250,10 @@ public final class Main {
                 System.out.println("(no items)");
                 return;
             }
-            // Build custom collection for iterator demo
-            it.fpili.imaginarium.iterator.CatalogItemCollection col =
-                    new it.fpili.imaginarium.iterator.CatalogItemCollection();
+            CatalogItemCollection col = new CatalogItemCollection();
             for (Item it : all) col.add(it);
 
-            it.fpili.imaginarium.iterator.ItemIterator iter = col.createIterator();
+            ItemIterator iter = col.createIterator();
             System.out.println("Iterating items via custom Iterator:");
             while (iter.hasNext()) {
                 Item it = iter.next();
@@ -221,19 +265,24 @@ public final class Main {
         }
     }
 
+    /**
+     * Exports the catalog to JSON through the Adapter and writes it to {@code data/items.json}.
+     *
+     * @param service catalog service (unused here but kept for symmetry/future needs)
+     * @param shield  shielding handler
+     */
     private static void exportJsonFlow(CatalogService service, ExceptionShieldingHandler shield) {
         try {
             String json = shield.guard(() -> {
-                var adapter = new it.fpili.imaginarium.adapter.CsvRepositoryToJsonAdapter(
-                        new it.fpili.imaginarium.persistence.CsvItemRepository(java.nio.file.Path.of("data","items.csv"))
-                );
+                var adapter = new CsvRepositoryToJsonAdapter(new CsvItemRepository(Path.of("data", "items.csv")));
                 return adapter.toJson();
             }, "Could not export JSON.");
 
-            it.fpili.imaginarium.util.SafeIO.writeUtf8(java.nio.file.Path.of("data","items.json"), json);
+            SafeIO.writeUtf8(Path.of("data", "items.json"), json);
             System.out.println("Exported to data/items.json");
-        } catch (it.fpili.imaginarium.exception.ApplicationException ae) {
+        } catch (ApplicationException ae) {
             System.err.println(ae.getMessage());
         }
     }
 }
+
