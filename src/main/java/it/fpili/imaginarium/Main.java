@@ -1,0 +1,221 @@
+package it.fpili.imaginarium;
+
+import it.fpili.imaginarium.composite.CatalogCategory;
+import it.fpili.imaginarium.composite.CatalogComponent;
+import it.fpili.imaginarium.composite.CatalogItem;
+import it.fpili.imaginarium.exception.ApplicationException;
+import it.fpili.imaginarium.exception.InputValidationException;
+import it.fpili.imaginarium.model.Item;
+import it.fpili.imaginarium.persistence.CsvItemRepository;
+import it.fpili.imaginarium.service.CatalogService;
+import it.fpili.imaginarium.shielding.ExceptionShieldingHandler;
+import it.fpili.imaginarium.util.InputSanitizer;
+import it.fpili.imaginarium.util.LoggerConfig;
+
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Command-line interface for the Imaginarium catalog.
+ * Features: add, list, search, category tree (Composite), custom iteration (Iterator),
+ * logging, input sanitization and exception shielding.
+ */
+public final class Main {
+    private static final Logger log = LoggerConfig.getLogger(Main.class);
+
+    /**
+     * Application entry point. Presents a looped menu and delegates to flows.
+     *
+     * @param args command-line arguments (unused)
+     */
+    public static void main(String[] args) {
+        log.info("Imaginarium CLI started");
+
+        // Repository + Service wiring (no hardcoded secrets/paths beyond relative demo data path).
+        CatalogService service = new CatalogService(
+                new CsvItemRepository(Path.of("data", "items.csv"))
+        );
+
+        // Centralized Exception Shielding handler.
+        ExceptionShieldingHandler shield = new ExceptionShieldingHandler(log);
+
+        try (Scanner sc = new Scanner(System.in)) {
+            boolean running = true;
+            while (running) {
+                printMenu();
+                System.out.print("> ");
+                String choice = sc.nextLine().trim();
+                switch (choice) {
+                    case "1" -> addItemFlow(sc, service, shield);
+                    case "2" -> listItemsFlow(service, shield);
+                    case "3" -> searchFlow(sc, service, shield);
+                    case "4" -> printCategoryTreeFlow(service, shield);
+                    case "5" -> iterateItemsFlow(service, shield);
+                    case "0" -> {
+                        running = false;
+                        System.out.println("Bye!");
+                    }
+                    default -> System.out.println("Unknown option. Please try again.");
+                }
+            }
+        } catch (Exception ex) {
+            // Last-resort guard for the CLI loop
+            log.log(Level.SEVERE, "Fatal error in CLI loop", ex);
+            System.err.println("Unexpected error. Please check logs.");
+            System.exit(2);
+        }
+
+        log.info("Imaginarium CLI stopped");
+    }
+
+    /**
+     * Prints the main menu.
+     */
+    private static void printMenu() {
+        System.out.println();
+        System.out.println("=== Imaginarium Catalog ===");
+        System.out.println("1) Add/Update item");
+        System.out.println("2) List items");
+        System.out.println("3) Search items");
+        System.out.println("4) Show categories tree");
+        System.out.println("5) Iterate items (custom iterator)");
+        System.out.println("0) Exit");
+    }
+
+    /**
+     * Handles the "add/update item" flow: reads sanitized input and calls the service through shielding.
+     */
+    private static void addItemFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            System.out.print("Id (max 40): ");
+            String id = InputSanitizer.sanitizeLine(sc.nextLine(), 40);
+
+            System.out.print("Name (max 80): ");
+            String name = InputSanitizer.sanitizeLine(sc.nextLine(), 80);
+
+            System.out.print("Category (max 80): ");
+            String cat = InputSanitizer.sanitizeLine(sc.nextLine(), 80);
+
+            System.out.print("Description (max 200): ");
+            String desc = InputSanitizer.sanitizeLine(sc.nextLine(), 200);
+
+            shield.guard(() -> service.upsertItem(id, name, cat, desc),
+                    "Could not save item. Please try again.");
+            System.out.println("Saved.");
+            log.info("Upserted item id=" + id);
+        } catch (InputValidationException ive) {
+            System.err.println("Validation error: " + ive.getMessage());
+            log.log(Level.WARNING, "Validation failed during addItem", ive);
+        } catch (ApplicationException ae) {
+            // Shielded message already safe for the user
+            System.err.println(ae.getMessage());
+            log.log(Level.WARNING, "Application error during save", ae);
+        }
+    }
+
+    /**
+     * Lists all items using the service guarded by Exception Shielding.
+     */
+    private static void listItemsFlow(CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            List<Item> all = shield.guard(service::findAll, "Could not list items.");
+            if (all.isEmpty()) {
+                System.out.println("(no items)");
+                return;
+            }
+            System.out.println("Items:");
+            for (Item it : all) {
+                System.out.println("- " + it.id() + " | " + it.name() + " | " + it.category() + " | " + it.description());
+            }
+        } catch (ApplicationException ae) {
+            System.err.println(ae.getMessage());
+        }
+    }
+
+    /**
+     * Searches items by a token with input sanitization and shielding.
+     */
+    private static void searchFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            System.out.print("Search token (max 80): ");
+            String token = InputSanitizer.sanitizeLine(sc.nextLine(), 80);
+
+            List<Item> found = shield.guard(() -> service.searchByToken(token),
+                    "Could not search items.");
+
+            if (found.isEmpty()) {
+                System.out.println("(no matches)");
+                return;
+            }
+            System.out.println("Matches:");
+            for (Item it : found) {
+                System.out.println("- " + it.id() + " | " + it.name() + " | " + it.category() + " | " + it.description());
+            }
+        } catch (InputValidationException ive) {
+            System.err.println("Validation error: " + ive.getMessage());
+            log.log(Level.WARNING, "Validation failed during search", ive);
+        } catch (ApplicationException ae) {
+            System.err.println(ae.getMessage());
+        }
+    }
+
+    /**
+     * Builds a Composite tree grouping items by their category and prints it.
+     */
+    private static void printCategoryTreeFlow(CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            List<Item> all = shield.guard(service::findAll, "Could not load items.");
+            if (all.isEmpty()) {
+                System.out.println("(no items)");
+                return;
+            }
+            CatalogCategory root = new CatalogCategory("Catalog");
+            Map<String, CatalogCategory> categories = new LinkedHashMap<>();
+
+            for (Item it : all) {
+                String catName = it.category().isEmpty() ? "(uncategorized)" : it.category();
+                CatalogCategory cat = categories.computeIfAbsent(catName, CatalogCategory::new);
+                cat.addComponent(new CatalogItem(it));
+            }
+            for (CatalogComponent c : categories.values()) {
+                root.addComponent(c);
+            }
+            root.showDetails();
+        } catch (ApplicationException ae) {
+            System.err.println(ae.getMessage());
+            log.log(Level.WARNING, "Error printing category tree", ae);
+        }
+    }
+
+    /**
+     * Demonstrates custom iteration over items using our Iterator pattern implementation.
+     */
+    private static void iterateItemsFlow(CatalogService service, ExceptionShieldingHandler shield) {
+        try {
+            List<Item> all = shield.guard(service::findAll, "Could not load items.");
+            if (all.isEmpty()) {
+                System.out.println("(no items)");
+                return;
+            }
+            // Build custom collection for iterator demo
+            it.fpili.imaginarium.iterator.CatalogItemCollection col =
+                    new it.fpili.imaginarium.iterator.CatalogItemCollection();
+            for (Item it : all) col.add(it);
+
+            it.fpili.imaginarium.iterator.ItemIterator iter = col.createIterator();
+            System.out.println("Iterating items via custom Iterator:");
+            while (iter.hasNext()) {
+                Item it = iter.next();
+                System.out.println("- " + it.name());
+            }
+        } catch (ApplicationException ae) {
+            System.err.println(ae.getMessage());
+            log.log(Level.WARNING, "Iterator flow error", ae);
+        }
+    }
+}
