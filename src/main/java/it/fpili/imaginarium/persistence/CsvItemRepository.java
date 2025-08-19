@@ -57,6 +57,7 @@ public final class CsvItemRepository implements Repository<Item, String> {
             index.clear();
             for (String line : content.split("\\R")) {
                 if (line.isBlank()) continue;
+                if (line.regionMatches(true, 0, "ID,Name,Category,Description", 0, 28)) continue; // skip header
                 String[] cols = CsvUtil.parseLine(line);
                 if (cols.length < 4) { log.warning("Skipping malformed line: " + line); continue; }
                 Item it = new CsvItemCreator(cols).build();
@@ -70,6 +71,10 @@ public final class CsvItemRepository implements Repository<Item, String> {
 
     private void persist() throws IoOperationException {
         StringBuilder sb = new StringBuilder();
+
+        // Always write header first
+        sb.append("ID,Name,Category,Description\n");
+
         for (Item it : index.values()) {
             sb.append(CsvUtil.esc(it.id())).append(',')
                     .append(CsvUtil.esc(it.name())).append(',')
@@ -77,6 +82,6 @@ public final class CsvItemRepository implements Repository<Item, String> {
                     .append(CsvUtil.esc(it.description())).append('\n');
         }
         SafeIO.writeUtf8(file, sb.toString());
-        log.fine("CSV persisted: " + index.size() + " items");
+        log.fine("CSV persisted: " + index.size() + " items (with header)");
     }
 }
