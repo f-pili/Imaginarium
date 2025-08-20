@@ -14,6 +14,13 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 
 ---
 
+## 📊 Project UML
+The following UML diagram summarizes the project architecture:
+
+![Imaginarium UML Diagram](UML-Diagrams/ImaginariumUML.png)
+
+---
+
 ## 🛠️ Technologies and Patterns Used
 
 ### Core Technologies
@@ -24,6 +31,7 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 ### Design Patterns (with Structure and Justification)
 
 #### 1. Factory Method
+![Factory Pattern](UML-Diagrams/Factory.png)
 - **Participants**:
     - `ItemCreator` (abstract creator)
     - `CsvItemCreator` (concrete creator from CSV)
@@ -33,6 +41,7 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 - **Benefit**: Extensible – new item sources (e.g., XML, DB rows) could be added easily by implementing a new creator.
 
 #### 2. Composite
+![Composite Pattern](UML-Diagrams/Composite.png)
 - **Participants**:
     - `CatalogComponent` (component interface)
     - `CatalogCategory` (composite node)
@@ -42,6 +51,7 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 - **Benefit**: Simple extensibility: subcategories or nested groups can be supported in future without changing client code.
 
 #### 3. Iterator
+![Iterator Pattern](UML-Diagrams/Iterator.png)
 - **Participants**:
     - `ItemIterator` (interface)
     - `CatalogItemIterator` (concrete iterator)
@@ -52,6 +62,7 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 - **Benefit**: Easy to extend with alternative iteration strategies (e.g., reverse order, filtering iterators).
 
 #### 4. Adapter
+![Adapter Pattern](UML-Diagrams/Adapter.png)
 - **Participants**:
     - `JsonExport` (target interface)
     - `CsvRepositoryToJsonAdapter` (adapter)
@@ -61,6 +72,7 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 - **Benefit**: Clean separation of concerns: persistence remains CSV, while clients can still get JSON output.
 
 #### 5. Exception Shielding
+![Exception Shielding](UML-Diagrams/ExceptionShielding.png)
 - **Participants**:
     - `ExceptionShieldingHandler`
 - **Intent**: Prevent low-level technical errors from leaking to users. Instead, controlled `ApplicationException` messages are shown.
@@ -74,10 +86,36 @@ It provides a safe, structured, and extensible way to manage items in a catalog,
 
 ---
 
-## 📊 UML Diagram
-The following UML diagram summarizes the project architecture:
+## ⚙️ How to Run
+- Clone the repository
+```bash
+git clone https://github.com/f-pili/Imaginarium.git
+cd Imaginarium
+```
+- Ensure Java 21 and Maven are installed
+```bash
+java -version
+mvn -version
+```
 
-![Imaginarium UML Diagram](UML-Diagrams/ImaginariumUML.png)
+- Compile the project using Maven
+```bash
+mvn clean compile
+```
+
+- Run the application using Maven
+```bash
+mvn exec:java -Dexec.mainClass="it.fpili.imaginarium.Main"
+```
+
+---
+
+## 🧪️ How to Tests
+
+- Run the full test suite with JUnit
+```bash
+mvn test
+```
 
 ---
 
@@ -95,5 +133,3 @@ The following UML diagram summarizes the project architecture:
 - Implement more advanced **search/filtering capabilities**.
 - Add **user roles and authentication** for multi-user scenarios.
 - Provide a **web frontend** to complement the CLI.
-
----
