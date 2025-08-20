@@ -20,4 +20,3 @@ public class InputValidationException extends ApplicationException {
         super(message);
     }
 }
-

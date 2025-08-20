@@ -54,4 +54,3 @@ public final class InputSanitizer {
         return s;
     }
 }
-

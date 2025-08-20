@@ -29,4 +29,3 @@ public interface ItemIterator {
      */
     Item next();
 }
-

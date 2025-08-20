@@ -51,4 +51,3 @@ public interface Repository<T, ID> {
      */
     void deleteById(ID id) throws ApplicationException;
 }
-

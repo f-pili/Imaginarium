@@ -43,4 +43,3 @@ public final class CsvItemCreator extends ItemCreator {
         return new Item(cols[0], cols[1], cols[2], cols[3]);
     }
 }
-

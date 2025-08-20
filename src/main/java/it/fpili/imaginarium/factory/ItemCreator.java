@@ -23,5 +23,3 @@ public abstract class ItemCreator {
         return createItem(); // no redundant local variable
     }
 }
-
-

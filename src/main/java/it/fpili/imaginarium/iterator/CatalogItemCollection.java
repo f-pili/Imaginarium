@@ -54,4 +54,3 @@ public final class CatalogItemCollection implements ItemCollection {
         return items.get(index);
     }
 }
-

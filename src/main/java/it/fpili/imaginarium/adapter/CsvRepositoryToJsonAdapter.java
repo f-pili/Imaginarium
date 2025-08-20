@@ -76,4 +76,3 @@ public final class CsvRepositoryToJsonAdapter implements JsonExport {
                 .replace("\r", "\\r");
     }
 }
-

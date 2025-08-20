@@ -128,4 +128,3 @@ public final class CsvItemRepository implements Repository<Item, String> {
         log.fine("CSV persisted: " + index.size() + " items (with header)");
     }
 }
-

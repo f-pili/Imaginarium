@@ -42,4 +42,3 @@ public final class UserInputItemCreator extends ItemCreator {
         return new Item(id, name, category, description);
     }
 }
-

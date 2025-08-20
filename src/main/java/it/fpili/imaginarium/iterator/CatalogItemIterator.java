@@ -46,4 +46,3 @@ public final class CatalogItemIterator implements ItemIterator {
         return collection.getAt(position++);
     }
 }
-

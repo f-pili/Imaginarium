@@ -89,4 +89,3 @@ public final class CatalogService {
         return repo.findAll();
     }
 }
-

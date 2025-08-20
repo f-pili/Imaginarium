@@ -22,4 +22,3 @@ public class IoOperationException extends ApplicationException {
         super(message, cause);
     }
 }
-
