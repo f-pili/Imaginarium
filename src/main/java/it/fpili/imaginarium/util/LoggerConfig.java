@@ -6,77 +6,98 @@ import java.nio.file.Path;
 import java.util.logging.*;
 
 /**
- * Centralized logger configuration for the application.
- * <p>
- * Ensures that all loggers across the codebase share the same configuration:
- * <ul>
- *   <li>Removes default JVM log handlers (avoiding duplicate output).</li>
- *   <li>Sets the root logging level to {@link Level#INFO}.</li>
- *   <li>Adds a {@link ConsoleHandler} with {@link SimpleFormatter} for stdout logging.</li>
- *   <li>Adds a rotating {@link FileHandler} writing under {@code logs/}, with rollover
- *       every ~1 MB and up to 3 files kept.</li>
- * </ul>
- * Loggers are obtained on a per-class basis via {@link #getLogger(Class)}.
- * The initialization is performed lazily and thread-safely (double-checked locking).
- * </p>
+ * Centralized logging configuration for Imaginarium.
+ * Provides simple console output for users and detailed rotating log files for developers.
  */
 public final class LoggerConfig {
+
+    /** Thread-safe initialization flag (double-checked locking). */
     private static volatile boolean initialized = false;
 
-    /** Private constructor to prevent instantiation (utility class). */
-    private LoggerConfig() {}
+    /** Private constructor to prevent instantiation. */
+    private LoggerConfig() { }
 
     /**
-     * Returns a logger scoped to the given class, ensuring the logging
-     * system is initialized exactly once.
+     * Returns a logger for the given class.
+     * Initializes configuration once with console and file handlers.
+     * Console: INFO+ messages.
+     * File: FINE+ messages with full details.
      *
-     * @param cls the class requesting a logger
-     * @return configured logger instance
+     * @param cls the class requesting the logger
+     * @return configured logger
      */
     public static Logger getLogger(Class<?> cls) {
         if (!initialized) {
             synchronized (LoggerConfig.class) {
-                if (!initialized) init();
+                if (!initialized) {
+                    init();
+                }
             }
         }
         return Logger.getLogger(cls.getName());
     }
 
     /**
-     * Initializes the logging configuration.
-     * Removes existing handlers, installs console and file handlers.
-     * <p>
-     * If the file handler cannot be created (e.g., due to missing permissions),
-     * logging will continue on the console only.
-     * </p>
+     * Sets up root logger with custom console and rotating file handlers.
+     * Called once automatically when a logger is first requested.
      */
     private static void init() {
         Logger root = LogManager.getLogManager().getLogger("");
-        for (Handler h : root.getHandlers()) root.removeHandler(h);
-
+        for (Handler h : root.getHandlers()) {
+            root.removeHandler(h);
+        }
         root.setLevel(Level.INFO);
+        installConsoleHandler(root);
+        installFileHandler(root);
+        initialized = true;
+    }
 
-        // Console handler
-        ConsoleHandler ch = new ConsoleHandler();
-        ch.setLevel(Level.INFO);
-        ch.setFormatter(new SimpleFormatter());
-        root.addHandler(ch);
+    /**
+     * Installs a console handler with simple, user-friendly messages.
+     *
+     * @param root the root logger
+     */
+    private static void installConsoleHandler(Logger root) {
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        consoleHandler.setLevel(Level.INFO);
+        consoleHandler.setFormatter(new SafeConsoleFormatter());
+        root.addHandler(consoleHandler);
+    }
 
-        // Rotating file handler (~1MB per file, up to 3 files, append mode)
+    /**
+     * Installs a rotating file handler for detailed logs.
+     * Logs stored under {@code logs/}, 1MB per file, 3 files kept.
+     *
+     * @param root the root logger
+     */
+    private static void installFileHandler(Logger root) {
         try {
             Path logDir = Path.of("logs");
-            if (!Files.exists(logDir)) Files.createDirectories(logDir);
-
-            FileHandler fh = new FileHandler("logs/imaginarium-%u-%g.log",
-                    1_000_000, 3, true);
-            fh.setEncoding("UTF-8");
-            fh.setLevel(Level.FINE);
-            fh.setFormatter(new SimpleFormatter());
-            root.addHandler(fh);
+            if (!Files.exists(logDir)) {
+                Files.createDirectories(logDir);
+            }
+            FileHandler fileHandler = new FileHandler(
+                    "logs/imaginarium-%u-%g.log",
+                    1_000_000, 3, true
+            );
+            fileHandler.setEncoding("UTF-8");
+            fileHandler.setLevel(Level.FINE);
+            fileHandler.setFormatter(new SimpleFormatter());
+            root.addHandler(fileHandler);
         } catch (IOException e) {
-            root.log(Level.WARNING, "File logging disabled: " + e.getMessage());
+            root.log(Level.WARNING,
+                    "File logging disabled: " + e.getMessage(), e);
         }
+    }
 
-        initialized = true;
+    /**
+     * Formatter for console output with only level and message.
+     * Hides technical details like class, method, or timestamps.
+     */
+    private static class SafeConsoleFormatter extends Formatter {
+        @Override
+        public String format(LogRecord record) {
+            return record.getLevel() + ": " + record.getMessage() + System.lineSeparator();
+        }
     }
 }
