@@ -1,5 +1,6 @@
 package it.fpili.imaginarium.persistence;
 
+import it.fpili.imaginarium.exception.ApplicationException;
 import it.fpili.imaginarium.exception.IoOperationException;
 import it.fpili.imaginarium.model.Item;
 import it.fpili.imaginarium.util.LoggerConfig;
@@ -68,15 +69,22 @@ public final class CsvItemRepository implements Repository<Item, String> {
     }
 
     /**
-     * Deletes an item by its ID and persists changes to disk.
+     * Deletes an item by its unique identifier from the repository.
+     * Throws exception if item does not exist, ensuring clear feedback for non-existent deletions.
+     * Updates both in-memory index and persistent CSV storage.
      *
-     * @param id the item identifier
-     * @throws IoOperationException if the write operation fails
+     * @param id the unique identifier of the item to delete
+     * @throws ApplicationException if no item exists with the specified ID, or if persistence fails
      */
+
     @Override
-    public synchronized void deleteById(String id) throws IoOperationException {
+    public synchronized void deleteById(String id) throws ApplicationException {
+        if (!index.containsKey(id)) {
+            throw new ApplicationException("Item with ID '" + id + "' not found");
+        }
         index.remove(id);
         persist();
+        log.fine("Successfully deleted item with id=" + id);
     }
 
     /**

@@ -130,8 +130,15 @@ public final class Main {
     }
 
     /**
-     * Handles the "delete item" flow: asks for an ID and deletes it.
+     * Handles the delete item CLI flow with input validation and error handling.
+     * Prompts user for item ID, sanitizes input, attempts deletion via service layer,
+     * and provides appropriate feedback. Success confirmation shown only if deletion succeeds.
+     *
+     * @param sc the scanner for reading user input from console
+     * @param service the catalog service for business logic and persistence
+     * @param shield the exception shielding handler for safe error messages
      */
+
     private static void deleteItemFlow(Scanner sc, CatalogService service, ExceptionShieldingHandler shield) {
         try {
             System.out.print("Enter ID to delete (max 40): ");
@@ -142,8 +149,9 @@ public final class Main {
                 return null;
             }, "Could not delete item. Please try again.");
 
-            System.out.println("Deleted item with id=" + id);
+            System.out.println("Successfully deleted item with ID: " + id);
             log.info("Deleted item id=" + id);
+
         } catch (InputValidationException ive) {
             System.err.println("Validation error: " + ive.getMessage());
             log.log(Level.WARNING, "Validation failed during deleteItem", ive);
