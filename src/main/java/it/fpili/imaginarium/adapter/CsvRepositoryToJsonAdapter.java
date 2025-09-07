@@ -14,6 +14,9 @@ import java.util.Objects;
  * repository data to a JSON string without changing the repository implementation or leaking
  * low-level details to callers.
  * </p>
+ * <p>
+ * Note: JSON is built manually with basic string escaping; no external JSON libraries are used.
+ * </p>
  */
 public final class CsvRepositoryToJsonAdapter implements JsonExport {
 
