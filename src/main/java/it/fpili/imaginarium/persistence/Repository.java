@@ -12,6 +12,9 @@ import java.util.Optional;
  * from business logic. Implementations may store entities in
  * memory, files, databases, or remote services.</p>
  *
+ * <p>Used the Generics for type-safety (compile time and not run time),
+ * reusability (same interface, different entities).</p>
+ *
  * @param <T>  entity type
  * @param <ID> identifier type (e.g. String, Long, UUID)
  */

@@ -49,7 +49,6 @@ final class CsvUtil {
      * @return an array of parsed values (never null, may be empty)
      */
     static String[] parseLine(String line) {
-        // Simple parser adequate for 4-column student exercise
         StringBuilder cur = new StringBuilder();
         boolean inQ = false;
         java.util.List<String> out = new java.util.ArrayList<>(4);

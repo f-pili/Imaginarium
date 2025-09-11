@@ -17,6 +17,7 @@ import java.util.logging.Logger;
  * File format: {@code ID,Name,Category,Description}
  * The first line is always a header, automatically written on persist.
  * Data is cached in an in-memory map for efficient lookups.
+ * LinkedHashMap is used to preserve insertion order.
  * </p>
  */
 public final class CsvItemRepository implements Repository<Item, String> {
@@ -43,8 +44,8 @@ public final class CsvItemRepository implements Repository<Item, String> {
      */
     @Override
     public synchronized void save(Item entity) throws IoOperationException {
-        index.put(entity.id(), entity);
-        persist();
+        index.put(entity.id(), entity); // First, it saves the Item in memory
+        persist(); // Then, it persists the changes to disk
     }
 
     /**
@@ -123,7 +124,6 @@ public final class CsvItemRepository implements Repository<Item, String> {
     private void persist() throws IoOperationException {
         StringBuilder sb = new StringBuilder();
 
-        // Always write header first
         sb.append("ID,Name,Category,Description\n");
 
         for (Item it : index.values()) {

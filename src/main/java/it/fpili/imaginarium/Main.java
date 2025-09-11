@@ -33,7 +33,8 @@ import java.util.logging.Logger;
  *
  * <p>This class is console-oriented and prints user-facing messages.</p>
  */
-public final class Main {
+public final class
+Main {
     private static final Logger log = LoggerConfig.getLogger(Main.class);
 
     /**

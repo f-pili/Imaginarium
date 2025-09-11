@@ -32,7 +32,7 @@ public final class CatalogService {
      * @param repo backing repository (must not be {@code null})
      * @throws NullPointerException if {@code repo} is {@code null}
      */
-    public CatalogService(Repository<Item, String> repo) {
+    public CatalogService(Repository<Item, String> repo) { // Catalog Service constructor
         this.repo = Objects.requireNonNull(repo, "repo must not be null");
     }
 
@@ -73,10 +73,10 @@ public final class CatalogService {
      * @throws ApplicationException if repository access fails or validation rejects input
      */
     public List<Item> searchByToken(String token) throws ApplicationException {
-        String t = InputSanitizer.sanitizeLine(token, 80).toLowerCase();
-        return repo.findAll().stream()
-                .filter(i -> i.name().toLowerCase().contains(t) || i.category().toLowerCase().contains(t))
-                .collect(Collectors.toList());
+        String t = InputSanitizer.sanitizeLine(token, 80).toLowerCase(); // Take input from user and sanitize it
+        return repo.findAll().stream() // Ask the repo for all items
+                .filter(i -> i.name().toLowerCase().contains(t) || i.category().toLowerCase().contains(t)) // For each item, filter by name or category to check if it matches the search token
+                .collect(Collectors.toList()); // Collect results into a list
     }
 
     /**
